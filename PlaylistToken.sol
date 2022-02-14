@@ -51,9 +51,21 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         _setTokenURI(playlist.playlistID, _playlistMetadata);
         allPlaylists.push(playlist);
     }
+    
+    // Owner can mint new Playlist NFTs
+    function mintNewPlaylist(string memory _nameOfPLaylist, string memory _playlistMetadata, string memory _ticker, address payable _treasury, uint _playlistSize) external onlyOwner {
+        Playlist storage playlist;
+        playlist.playlistID ++;
+        playlist.playlistMetadata = _playlistMetadata;
+        playlist.treasury = _treasury;
+        playlist.playlistSize = _playlistSize;
+        _safeMint(msg.sender, playlist.playlistID);
+        _setTokenURI(playlist.playlistID, _playlistMetadata);
+        allPlaylists.push(playlist);
+    }
 
     // Owner can burn the Playlist NFT
-    function _burnPlaylist(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
+    function burnPlaylist(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
         super._burn(tokenId);
     }
 
