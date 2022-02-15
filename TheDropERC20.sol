@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFractio
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 
 contract PlaylistGovernor is Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl {
-    constructor(string memory _nameGovernor, ERC20Votes _token, TimelockController _timelock)
+    constructor(string memory _nameGovernor, IVotes _token, TimelockController _timelock)
         Governor(_nameGovernor)
         GovernorSettings(1 /* 1 block */, 45818 /* 1 week */, 100e18)
         GovernorVotes(_token)

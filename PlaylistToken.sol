@@ -12,19 +12,20 @@ that keep track of a Leaderboard of songNFTs, voted by a erc20 community.
 
 contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //the playlist can be transferred, sold
     
+    using Counters for Counters.Counter;
+
+    Counters.Counter private _tokenIdCounter;
     
-    ERC20 repTokenAddress; // the erc20 token we shall consider for voting
+    // ERC20 repTokenAddress; // the erc20 token we shall consider for voting
 
     struct Playlist { // we need a Playlist struct for new playlists
+        string name;
         uint256 playlistID;
         string playlistMetadata;
-        uint playlistSize;
         address payable treasury;
+        Song[] songs;
         mapping(uint256 => Song) songLeaderboard;
     }
-
-    Playlist[] public allPlaylists;
-
 
     struct Song { // every songNFT info need to be added as a struct
         address payable creator;
@@ -33,71 +34,57 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         uint256 score;
     }
 
-    Song[] public allsongs;
+    mapping (uint => Playlist) playlists;
 
     modifier hasRepToken {
-        require(repTokenAddress.balanceOf(msg.sender) >= 1*10**18, "you need 1 Reputation Token at least");
+        // require(repTokenAddress.balanceOf(msg.sender) >= 1*10**18, "you need 1 Reputation Token at least");
+        require(false);
         _;
     }
     
-    constructor(address _repToken, string memory _nameOfPLaylist, string memory _playlistMetadata, string memory _ticker, address payable _treasury, uint _playlistSize ) ERC721(_nameOfPLaylist, _ticker) {
-        Playlist storage playlist;
-        repTokenAddress = ERC20(_repToken);
-        playlist.playlistID ++;
-        playlist.playlistMetadata = _playlistMetadata;
-        playlist.treasury = _treasury;
-        playlist.playlistSize = _playlistSize;
-        _safeMint(msg.sender, playlist.playlistID);
-        _setTokenURI(playlist.playlistID, _playlistMetadata);
-        allPlaylists.push(playlist);
-    }
-    
-    // Owner can mint new Playlist NFTs
-    function mintNewPlaylist(string memory _nameOfPLaylist, string memory _playlistMetadata, string memory _ticker, address payable _treasury, uint _playlistSize) external onlyOwner {
-        Playlist storage playlist;
-        playlist.playlistID ++;
-        playlist.playlistMetadata = _playlistMetadata;
-        playlist.treasury = _treasury;
-        playlist.playlistSize = _playlistSize;
-        _safeMint(msg.sender, playlist.playlistID);
-        _setTokenURI(playlist.playlistID, _playlistMetadata);
-        allPlaylists.push(playlist);
+    constructor(address _repToken) ERC721("PlayListToken", "PlayList") {
+        // repTokenAddress = ERC20(_repToken);        
     }
 
-    // Owner can burn the Playlist NFT
-    function burnPlaylist(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
+    function safeMint(address to, string memory _nameOfPLaylist, string memory _playlistMetadata, address payable _treasury) public onlyOwner {
+        uint256 tokenId = _tokenIdCounter.current();        
+        playlists[tokenId].name = _nameOfPLaylist;
+        playlists[tokenId].playlistID = tokenId;
+        playlists[tokenId].playlistMetadata = _playlistMetadata;
+        playlists[tokenId].treasury = _treasury;
+        _tokenIdCounter.increment();
+        _safeMint(to, tokenId);        
+    }
+    
+    // The following functions are overrides required by Solidity.
+
+    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
         super._burn(tokenId);
     }
 
-    // Shows the playlist URI, e.g. the cover image 
-    function playlistTokenURI(uint256 tokenId)
-        public
-        view
-        override(ERC721, ERC721URIStorage)
-        returns (string memory)
+    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory)
     {
         return super.tokenURI(tokenId);
     }
 
     // change each playlist's treasury, can turn out useful for incentives
     function changeTreasury(uint256 _playlistID, address payable _newTreasury) external onlyOwner {
-        Playlist memory playlist = allPlaylists[_playlistID];
+        Playlist storage playlist = playlists[_playlistID];
         playlist.treasury = _newTreasury;
     }
     
     // create a new Song struct out of a songNFT
     function addSong(uint256 _playlistID, address payable _creator, address _NFTcontract, uint256 _tokenId) external onlyOwner {
-        Playlist memory playlist = allPlaylists[_playlistID];
+        Playlist storage playlist = playlists[_playlistID];
         Song memory newsong;
         newsong.creator = _creator;
         newsong.tokenAddr = _NFTcontract;
         newsong.tokenId = _tokenId;
         newsong.score = 0;
-        allsongs.push(newsong);
-        playlist.songLeaderboard[newsong.score][newsong];
-
+        playlist.songs.push(newsong);
     }
 
+/*
     function upvoteSong (uint256 _playlistID, uint256 _songId) external hasRepToken returns(bool) {
         Playlist memory playlist = allPlaylists[_playlistID];
         Song memory currentSong = allsongs[_songId];
@@ -126,5 +113,5 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
             }
         }
     }
-
+*/
 }
