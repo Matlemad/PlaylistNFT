@@ -3,7 +3,7 @@ pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "./SongNFTfactory.sol"; 
-import "./TheDropERC20.sol";
+import "./ERC20.sol";
 
 /** PlaylistToken is a erc721 factory that creates "playlist" NFTs, empty container-items
 that keep track of a Leaderboard of songNFTs, voted by a erc20 community.
@@ -16,7 +16,7 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
 
     Counters.Counter private _tokenIdCounter;
     
-    // ERC20 repTokenAddress; // the erc20 token we shall consider for voting
+    ERC20 repTokenAddress; // the erc20 token we shall consider for voting
 
     struct Playlist { // we need a Playlist struct for new playlists
         string name;
@@ -37,13 +37,12 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
     mapping (uint => Playlist) playlists;
 
     modifier hasRepToken {
-        // require(repTokenAddress.balanceOf(msg.sender) >= 1*10**18, "you need 1 Reputation Token at least");
-        require(false);
+        require(repTokenAddress.balanceOf(msg.sender) >= 1*10**18, "you need 1 Reputation Token at least");
         _;
     }
     
     constructor(address _repToken) ERC721("PlayListToken", "PlayList") {
-        // repTokenAddress = ERC20(_repToken);        
+        repTokenAddress = ERC20(_repToken);        
     }
 
     function safeMint(address to, string memory _nameOfPLaylist, string memory _playlistMetadata, address payable _treasury) public onlyOwner {
@@ -81,37 +80,42 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         newsong.tokenAddr = _NFTcontract;
         newsong.tokenId = _tokenId;
         newsong.score = 0;
+        playlist.songLeaderboard[_tokenId] = newsong;
         playlist.songs.push(newsong);
     }
 
-/*
-    function upvoteSong (uint256 _playlistID, uint256 _songId) external hasRepToken returns(bool) {
-        Playlist memory playlist = allPlaylists[_playlistID];
-        Song memory currentSong = allsongs[_songId];
-        currentSong.score++;
-        repTokenAddress._burn(msg.sender, 10*10**17); // upvoting requests msg.sender to burn 0.1 repToken. Alternatively can transfer these erc20 to the Playlist treasury
 
-        //if the score is too low, do not update
-        if(playlist.songLeaderboard[playlist.playlistSize - 1].score >= currentSong.score) return false;
-        
-        //loop through the playlist
-        for (uint256 i = 0; i < playlist.playlistSize; i++) {
-        // find where to insert the new score
-            if (playlist.songLeaderboard[i].score < currentSong.score) {
-            // shift leaderboard
-            Song memory thisSong = playlist.songLeaderboard[i];
-            for (uint256 j = i + 1; j < playlist.playlistSize + 1; j++) {
-                    Song memory nextSong = playlist.songLeaderboard[j];
-                    playlist.songLeaderboard[j] = thisSong;
-                    thisSong = nextSong;
-                }
-            // insert
-                playlist.songLeaderboard[i] = currentSong;
-                // delete last from list
-                delete playlist.songLeaderboard[playlist.playlistSize];
-                return true;
-            }
-        }
+    function upvoteSong (uint256 _playlistID, uint256 _songId) external hasRepToken {
+        Playlist storage playlist = playlists[_playlistID];
+        Song storage currentSong = playlist.songLeaderboard[_songId];
+        currentSong.score += 1;
+        //repTokenAddress.transfer(currentSong.creator, 10*10**17); // upvoting requests msg.sender to burn 0.1 repToken. Alternatively can transfer these erc20 to the Playlist treasury
     }
-*/
+
+    function viewSong(uint256 _playlistID, uint256 _songId) external view returns(Song memory) {
+        Playlist storage playlist = playlists [_playlistID];
+        Song storage song = playlist.songLeaderboard[_songId];
+        return song;
+
+    }
+
+    function viewLeaderboard (uint256 _playlistID) external view returns(Song[] memory) {
+        Playlist storage playlist = playlists[_playlistID];
+        Song[] memory arr = playlist.songs;
+        uint256 l = playlist.songs.length;
+
+        for(uint i = 0; i <= l; i++ ) {
+            for(uint j = i+1; j < l ;j++) {
+                if(arr[i].score > arr[j].score) {
+                    Song memory temp = arr[i];
+                    arr[i] = arr[j];
+                    arr[j] = temp;
+                }
+            }
+
+        }
+
+        return arr;
+
+    }
 }
