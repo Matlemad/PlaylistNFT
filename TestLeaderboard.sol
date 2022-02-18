@@ -1,15 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
 
-
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "./SongNFTfactory.sol"; 
-
 contract TestSort {
-
-    using Counters for Counters.Counter;
-
-    Counters.Counter private _tokenIdCounter;
 
 
     struct Board{
@@ -25,9 +17,8 @@ contract TestSort {
 
     mapping(uint => Board) public allBoards;
 
-    function addBoard(string memory _name) external {
-        uint256 tokenId = _tokenIdCounter.current();
-        allBoards[tokenId].name = _name;
+    function addBoard(string memory _name, uint256 _boardID) external {
+        allBoards[_boardID].name = _name;
     }
 
     function addParticipant(uint _boardID, uint _partId, uint _score) external {
