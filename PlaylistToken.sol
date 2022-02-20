@@ -3,7 +3,7 @@ pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "./SongNFTfactory.sol"; 
-import "./ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /** PlaylistToken is a erc721 factory that creates "playlist" NFTs, empty container-items
 that keep track of a Leaderboard of songNFTs, voted by a erc20 community.
@@ -23,18 +23,22 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         uint256 playlistID;
         string playlistMetadata;
         address payable treasury;
-        Song[] songs;
-        mapping(uint256 => Song) songLeaderboard;
+        uint[] songs;
+        mapping(uint256 => Song) songsMetadata;
+        uint[][] leaderBoard;
+        mapping(address => uint256) voters; // keep track of the voters so the vote can be discarded.
+        mapping (bytes => uint) songsPositionsInLeaderBoard; // keep track of the index where a song is in the leaderboard, so it can easily be removed.
     }
-
+    
     struct Song { // every songNFT info need to be added as a struct
         address payable creator;
         address tokenAddr;
         uint256 tokenId;
-        uint256 score;
+        uint score;
     }
 
-    mapping (uint => Playlist) playlists;
+    mapping (uint => Playlist) public playlists;
+    
 
     modifier hasRepToken {
         require(repTokenAddress.balanceOf(msg.sender) >= 1*10**18, "you need 1 Reputation Token at least");
@@ -80,42 +84,73 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         newsong.tokenAddr = _NFTcontract;
         newsong.tokenId = _tokenId;
         newsong.score = 0;
-        playlist.songLeaderboard[_tokenId] = newsong;
-        playlist.songs.push(newsong);
+        playlist.songsMetadata[_tokenId] = newsong;
+        playlist.songs.push(_tokenId);
     }
 
 
     function upvoteSong (uint256 _playlistID, uint256 _songId) external hasRepToken {
+        // get the song.
         Playlist storage playlist = playlists[_playlistID];
-        Song storage currentSong = playlist.songLeaderboard[_songId];
-        currentSong.score += 1;
+        Song storage currentSong = playlist.songsMetadata[_songId];
+        
+        // increment the score and update the leaderboard.
+        updateRankByLeaderboard(playlist, currentSong, 1);
+        
+        // save the index position of the song in the leaderboard in case we have to remove it afterward.
+        playlist.songsPositionsInLeaderBoard[abi.encodePacked(currentSong.score, _songId)] = playlist.leaderBoard[currentSong.score].length;
+        
+        // keep track of the voter so he/she can discard the vote.
+        playlist.voters[msg.sender] = _songId + 1; // 0 means, it's not a voter
+        
+        // burn the token.
         //repTokenAddress.transfer(currentSong.creator, 10*10**17); // upvoting requests msg.sender to burn 0.1 repToken. Alternatively can transfer these erc20 to the Playlist treasury
+    }
+
+    function discardVote (uint256 _playlistID) external {
+        // get the playlist.
+        Playlist storage playlist = playlists[_playlistID];
+        
+        // sender should already have voted in this leaderboard     
+        require(playlist.voters[msg.sender] > 0, "sender should be a voter");
+        
+        // get the song the sender has voted for.
+        uint songId = playlist.voters[msg.sender] - 1;
+
+        // reinitialize msg.sender as non-voter and continue.
+        playlist.voters[msg.sender] = 0;
+
+        // get the song.   
+        Song storage currentSong = playlist.songsMetadata[songId];
+        
+        // decrement the score and update the leaderboard.
+        updateRankByLeaderboard(playlist, currentSong, -1);
+    }
+
+    function updateRankByLeaderboard(Playlist storage playlist, Song storage song, int8 direction) internal {
+        // get the index in the leaderboard where the song is located.
+        uint index = playlist.songsPositionsInLeaderBoard[abi.encodePacked(song.score, song.tokenId)];
+        
+        // remove the song from the current leaderboard position.
+        uint[] storage songs = playlist.leaderBoard[song.score];
+        songs[index] = songs[songs.length - 1];
+        songs.pop();
+        
+        // update the score
+        if (direction == 1) {
+            song.score = song.score + 1;
+        } else {
+            song.score = song.score - 1;
+        }        
+
+        // push the song in the new position.
+        songs = playlist.leaderBoard[song.score];
+        songs.push(song.tokenId);
     }
 
     function viewSong(uint256 _playlistID, uint256 _songId) external view returns(Song memory) {
         Playlist storage playlist = playlists [_playlistID];
-        Song storage song = playlist.songLeaderboard[_songId];
+        Song storage song = playlist.songsMetadata[_songId];
         return song;
-
-    }
-
-    function viewLeaderboard (uint256 _playlistID) external view returns(Song[] memory) {
-        Playlist storage playlist = playlists[_playlistID];
-        Song[] memory arr = playlist.songs;
-        uint256 l = playlist.songs.length;
-
-        for(uint i = 0; i <= l; i++ ) {
-            for(uint j = i+1; j < l ;j++) {
-                if(arr[i].score > arr[j].score) {
-                    Song memory temp = arr[i];
-                    arr[i] = arr[j];
-                    arr[j] = temp;
-                }
-            }
-
-        }
-
-        return arr;
-
     }
 }
