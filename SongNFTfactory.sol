@@ -22,7 +22,7 @@ contract SongNFTfactory is ERC721, ERC721URIStorage, ERC721Burnable, Ownable {
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
         _safeMint(to, tokenId);
-        _setTokenURI(tokenId, uri);
+        _setTokenURI(tokenId, mp3Uri);
     }
 
     // The following functions are overrides required by Solidity.
