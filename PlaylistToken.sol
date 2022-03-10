@@ -3,7 +3,7 @@ pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "./SongNFTfactory.sol"; 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./TheDropERC20.sol";
 
 /** PlaylistToken is a erc721 factory that creates "playlist" NFTs, empty container-items
 that keep track of a Leaderboard of songNFTs, voted by a erc20 community.
@@ -16,24 +16,22 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
 
     Counters.Counter private _tokenIdCounter;
     
-    IERC20 private repTokenAddress; // the erc20 token we shall consider for voting
+    DropRepToken public repTokenAddress; // the erc20 token we shall consider for voting
     ERC721 songNFTAddress; // the songNFT collection we restrict the playlist to 
 
     struct Playlist { // we need a Playlist struct for new playlists
         string name;
         uint256 playlistID;
         string playlistMetadata;
-        Song[] songs;
+        uint[] songs;
         mapping(uint256 => Song) songsMetadata;
-        mapping(uint => bool) isInLeaderBoard;
         mapping(address => uint256) voters; // keep track of the voters so the vote can be discarded.
-        mapping (bytes => uint) songsPositionsInLeaderBoard;
         uint256 topScore;
     }
     
     struct Song { // every songNFT info need to be added as a struct
         address payable creator;
-        address tokenAddr;
+        ERC721 tokenAddr;
         uint256 tokenId;
         uint score;
     }
@@ -46,8 +44,8 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         _;
     }
     
-    constructor(IERC20 _repTokenAddr, address _songNFTAddr) ERC721("PlayListToken", "PlayList") {
-        repTokenAddress = _repTokenAddr; 
+    constructor(address _songNFTAddr) ERC721("PlayListToken", "PlayList") {
+        repTokenAddress = new DropRepToken(address(this)); 
         songNFTAddress = ERC721(_songNFTAddr);       
     }
 
@@ -58,6 +56,10 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         playlists[tokenId].playlistMetadata = _playlistMetadata;
         _tokenIdCounter.increment();
         _safeMint(to, tokenId);        
+    }
+
+    function mint(address to, uint256 amount) public onlyOwner {
+        repTokenAddress.mint(to, amount);
     }
     
     // The following functions are overrides required by Solidity.
@@ -72,7 +74,7 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
     
     // create a new Song struct out of a songNFT
     function addSong(uint256 _playlistID, address payable _creator, ERC721 _NFTcontract, uint256 _tokenId) external onlyOwner {
-        require(songNFTAddress = _NFTcontract, "Invalid NFT contract address"); // make sure the songNFT belongs to the collection we declared
+        require(songNFTAddress == _NFTcontract, "Invalid NFT contract address"); // make sure the songNFT belongs to the collection we declared
         Playlist storage playlist = playlists[_playlistID];
         Song memory newsong;
         newsong.creator = _creator;
@@ -80,10 +82,7 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         newsong.tokenId = _tokenId;
         newsong.score = 0;
         playlist.songsMetadata[_tokenId] = newsong;
-        playlist.songs.push(newsong);
-        // save the index position of the song in the leaderboard in case we have to remove it afterward.
-        playlist.songsPositionsInLeaderBoard[abi.encodePacked(_tokenId)] = playlist.songs.length - 1;
-        playlist.isInLeaderBoard[newsong.tokenId] = true;
+        playlist.songs.push(_tokenId);
     }
 
 
@@ -91,13 +90,10 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         Playlist storage playlist = playlists[_playlistID];
         Song storage currentSong = playlist.songsMetadata[_tokenId];
 
-        require(playlist.isInLeaderBoard[currentSong.tokenId], "song not in Leaderboard");
+        require(playlist.songsMetadata[currentSong.tokenId].creator != address(0), "song not in Leaderboard");
         currentSong.score++;
-
-        uint index = playlist.songsPositionsInLeaderBoard[abi.encodePacked(currentSong.tokenId)];
-
-        
-        playlist.songs[index].score += 1;
+              
+        playlist.songsMetadata[_tokenId].score += 1;
         
         // keep track of the voter so he/she can discard the vote.
         playlist.voters[msg.sender] = _tokenId + 1; // 0 means, it's not a voter
@@ -132,10 +128,9 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
     }
 
 
-    function getAllSongsInLeaderboard(uint _playlistID) external view returns(Song[] memory) {
+    function getAllSongsInLeaderboard(uint _playlistID) external view returns(uint[] memory) {
         Playlist storage playlist = playlists[_playlistID];
         return playlist.songs;
-
     }
 
 

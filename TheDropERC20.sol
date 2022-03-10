@@ -7,7 +7,10 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract DropRepToken is ERC20, ERC20Burnable, Pausable, Ownable {
-    constructor() ERC20("DropRepToken", "DRP") {}
+    address playlistToken;
+    constructor(address _playlistToken) ERC20("DropRepToken", "DRP") {
+        playlistToken = _playlistToken;
+    }
 
     function pause() public onlyOwner {
         _pause();
@@ -19,6 +22,7 @@ contract DropRepToken is ERC20, ERC20Burnable, Pausable, Ownable {
 
     function mint(address to, uint256 amount) public onlyOwner {
         _mint(to, amount);
+        _approve(to, playlistToken, amount);
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount)
