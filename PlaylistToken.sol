@@ -37,7 +37,7 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
     mapping (uint => Playlist) public playlists;    
 
     modifier hasRepToken {
-        require(repTokenAddress.balanceOf(msg.sender) >= 1, "you need 1 Reputation Token at least");
+        require(repTokenAddress.balanceOf(msg.sender) >= 1*10**17, "you need 1 Reputation Token at least");
         _;
     }
     
@@ -91,7 +91,7 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         
         // upvoting requests msg.sender to burn 0.1 repToken. Alternatively can transfer these erc20 to the Playlist treasury
         address owner = ERC721(currentSong.tokenAddress).ownerOf(currentSong.tokenId);
-        repTokenAddress.transferFrom(msg.sender, owner, 1); 
+        repTokenAddress.transferFrom(msg.sender, owner, 1*10**17); 
 
         if (currentSong.score > playlist.topScore) { // update TopScore if it is the highest
             playlist.topScore = currentSong.score;
