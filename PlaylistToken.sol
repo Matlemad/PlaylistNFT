@@ -37,7 +37,7 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
     mapping (uint => Playlist) public playlists;    
 
     modifier hasRepToken {
-        require(repTokenAddress.balanceOf(msg.sender) >= 1*10**17, "you need 1 Reputation Token at least");
+        require(repTokenAddress.balanceOf(msg.sender) >= 1*10**17, "you need 0.1 Reputation Token at least");
         _;
     }
     
