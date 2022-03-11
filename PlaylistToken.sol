@@ -23,21 +23,18 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         string name;
         uint256 playlistID;
         string playlistMetadata;
-        uint[] songs;
-        mapping(uint256 => Song) songsMetadata;
+        Song[] songs;
         mapping(address => uint256) voters; // keep track of the voters so the vote can be discarded.
         uint256 topScore;
     }
-    
-    struct Song { // every songNFT info need to be added as a struct
-        address payable creator;
-        ERC721 tokenAddr;
-        uint256 tokenId;
-        uint score;
-    }
 
-    mapping (uint => Playlist) public playlists;
-    
+    struct Song {
+        address tokenAddress;
+        uint tokenId;
+        uint score;
+    }    
+
+    mapping (uint => Playlist) public playlists;    
 
     modifier hasRepToken {
         require(repTokenAddress.balanceOf(msg.sender) >= 1, "you need 1 Reputation Token at least");
@@ -73,33 +70,28 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
     }
     
     // create a new Song struct out of a songNFT
-    function addSong(uint256 _playlistID, address payable _creator, ERC721 _NFTcontract, uint256 _tokenId) external onlyOwner {
+    function addSong(uint256 _playlistID, ERC721 _NFTcontract, uint256 _tokenId) external onlyOwner {
         require(songNFTAddress == _NFTcontract, "Invalid NFT contract address"); // make sure the songNFT belongs to the collection we declared
         Playlist storage playlist = playlists[_playlistID];
         Song memory newsong;
-        newsong.creator = _creator;
-        newsong.tokenAddr = _NFTcontract;
+        newsong.tokenAddress = address(_NFTcontract);
         newsong.tokenId = _tokenId;
         newsong.score = 0;
-        playlist.songsMetadata[_tokenId] = newsong;
-        playlist.songs.push(_tokenId);
+        playlist.songs.push(newsong);
     }
 
-
-    function upvoteSong (uint256 _playlistID, uint256 _tokenId) external /*hasRepToken*/ {
+    function upvoteSong (uint256 _playlistID, uint256 index) external /*hasRepToken*/ {
         Playlist storage playlist = playlists[_playlistID];
-        Song storage currentSong = playlist.songsMetadata[_tokenId];
+        Song storage currentSong = playlist.songs[index];
 
-        require(playlist.songsMetadata[currentSong.tokenId].creator != address(0), "song not in Leaderboard");
         currentSong.score++;
               
-        playlist.songsMetadata[_tokenId].score += 1;
-        
         // keep track of the voter so he/she can discard the vote.
-        playlist.voters[msg.sender] = _tokenId + 1; // 0 means, it's not a voter
+        playlist.voters[msg.sender] = index + 1; // 0 means, it's not a voter
         
         // upvoting requests msg.sender to burn 0.1 repToken. Alternatively can transfer these erc20 to the Playlist treasury
-        repTokenAddress.transferFrom(msg.sender, currentSong.creator, 1); 
+        address owner = ERC721(currentSong.tokenAddress).ownerOf(currentSong.tokenId);
+        repTokenAddress.transferFrom(msg.sender, owner, 1); 
 
         if (currentSong.score > playlist.topScore) { // update TopScore if it is the highest
             playlist.topScore = currentSong.score;
@@ -121,17 +113,8 @@ contract PlaylistToken is ERC721, ERC721Burnable, ERC721URIStorage, Ownable { //
         playlist.songScore[currentSong.tokenId] -= 1;
     } */
 
-    function viewSong(uint256 _playlistID, uint256 _songId) external view returns(Song memory) {
-        Playlist storage playlist = playlists [_playlistID];
-        Song storage song = playlist.songsMetadata[_songId];
-        return song;
-    }
-
-
-    function getAllSongsInLeaderboard(uint _playlistID) external view returns(uint[] memory) {
+    function getPlaylistSongs(uint _playlistID) public view returns(Song[] memory) {
         Playlist storage playlist = playlists[_playlistID];
         return playlist.songs;
     }
-
-
 }
